@@ -68,6 +68,13 @@ pub(super) fn run_foreground(root: &Path, lang: Lang) -> Result<String> {
     }
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|_| CliError::data("Cannot start the translation runtime."))?;
+    // Install the SIGINT handler before printing so an immediate Ctrl+C cannot terminate the process.
+    #[cfg(unix)]
+    let mut interrupt = {
+        let _guard = runtime.enter();
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+            .map_err(|_| CliError::data("Cannot listen for Ctrl+C."))?
+    };
     // A foreground process only. No detached child, service, account operation
     // or security-setting change; the runtime's lease handles process exit.
     let _worker = app_experiments::start_foreground(root);
@@ -80,6 +87,11 @@ pub(super) fn run_foreground(root: &Path, lang: Lang) -> Result<String> {
             "Maintaining translation; waiting for Antigravity App. Ctrl+C stops foreground renewals."
         }
     );
+    #[cfg(unix)]
+    runtime
+        .block_on(interrupt.recv())
+        .ok_or_else(|| CliError::data("Cannot listen for Ctrl+C."))?;
+    #[cfg(not(unix))]
     runtime
         .block_on(tokio::signal::ctrl_c())
         .map_err(|_| CliError::data("Cannot listen for Ctrl+C."))?;

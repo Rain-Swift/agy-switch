@@ -608,10 +608,10 @@ pub fn prompt_line_with_cancel(prompt: &str, max_chars: usize) -> PromptResult {
     prompt_input(prompt, max_chars, false)
 }
 fn prompt_input(prompt: &str, max_chars: usize, secret: bool) -> PromptResult {
-    print!("{}", prompt);
-    let _ = io::stdout().flush();
-
+    // Enter raw mode before flushing the prompt so fast/automated input never hits cooked ECHO or ICRNL.
     if let Some(_raw) = RawTerminal::enter() {
+        print!("{}", prompt);
+        let _ = io::stdout().flush();
         let mut buffer = Vec::<char>::new();
         let mut position = 0usize;
         loop {
@@ -657,6 +657,8 @@ fn prompt_input(prompt: &str, max_chars: usize, secret: bool) -> PromptResult {
 
     // Refuse credential entry if a terminal with echo disabled is unavailable.
     if secret { return PromptResult::Cancelled; }
+    print!("{}", prompt);
+    let _ = io::stdout().flush();
     let mut line = String::new();
     if io::stdin().read_line(&mut line).is_ok() {
         PromptResult::Confirmed(line.trim().to_string())
@@ -665,23 +667,35 @@ fn prompt_input(prompt: &str, max_chars: usize, secret: bool) -> PromptResult {
     }
 }
 
-pub(super) fn wait_for_key(lang: Lang) {
+pub(super) fn wait_for_key_with_message(lang: Lang, message: Option<&str>) {
     let msg = match lang {
         Lang::Zh => "按 Esc 或任意键返回...",
         Lang::En => "Press Esc or any key to return...",
     };
-    print!("\n\x1b[2m{}\x1b[0m", msg);
-    let _ = io::stdout().flush();
     {
         if let Some(_raw) = RawTerminal::enter() {
+            if let Some(line) = message {
+                println!("{}", line);
+            }
+            print!("\n\x1b[2m{}\x1b[0m", msg);
+            let _ = io::stdout().flush();
             while matches!(read_key_action(), KeyAction::Redraw | KeyAction::None) {}
             print!("\x1b[2K\r");
             let _ = io::stdout().flush();
             return;
         }
     }
+    if let Some(line) = message {
+        println!("{}", line);
+    }
+    print!("\n\x1b[2m{}\x1b[0m", msg);
+    let _ = io::stdout().flush();
     let mut input = String::new();
     let _ = io::stdin().read_line(&mut input);
+}
+
+pub(super) fn wait_for_key(lang: Lang) {
+    wait_for_key_with_message(lang, None);
 }
 
 pub fn select_menu_interactive(title: &str, items: &[&str], initial: usize, lang: Lang) -> Option<usize> {
@@ -1840,6 +1854,7 @@ fn show_token_statistics(lang: Lang) {
     let mut show_today_detail = false;
 
     loop {
+        let _raw = RawTerminal::enter();
         print!("\x1b[2J\x1b[H");
         if !show_today_detail {
             let title = match lang {
@@ -1995,24 +2010,22 @@ fn show_token_statistics(lang: Lang) {
             let _ = io::stdout().flush();
         }
 
-            {
-            if let Some(_raw) = RawTerminal::enter() {
-                match read_key_action() {
-                    KeyAction::Char('m') | KeyAction::Char('M') | KeyAction::Char('\t') => {
-                        show_today_detail = !show_today_detail;
-                    }
-                    KeyAction::Enter | KeyAction::Char('0') | KeyAction::Char('q') | KeyAction::Char('Q') | KeyAction::Cancel => {
-                        if show_today_detail {
-                            show_today_detail = false;
-                        } else {
-                            break;
-                        }
-                    }
-                    _ => {}
+        if _raw.is_some() {
+            match read_key_action() {
+                KeyAction::Char('m') | KeyAction::Char('M') | KeyAction::Char('\t') => {
+                    show_today_detail = !show_today_detail;
                 }
-            } else {
-                break;
+                KeyAction::Enter | KeyAction::Char('0') | KeyAction::Char('q') | KeyAction::Char('Q') | KeyAction::Cancel => {
+                    if show_today_detail {
+                        show_today_detail = false;
+                    } else {
+                        break;
+                    }
+                }
+                _ => {}
             }
+        } else {
+            break;
         }
     }
 }

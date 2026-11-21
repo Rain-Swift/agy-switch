@@ -8,16 +8,16 @@ fn menu(lang: Lang, title: &str, items: &[String], initial: usize) -> Option<usi
     picker::select_menu_interactive(title, &items.iter().map(String::as_str).collect::<Vec<_>>(), initial, lang)
 }
 fn report(lang: Lang, result: Result<(), CliError>) {
-    match result {
-        Ok(()) => println!("{}", text(lang, "设置已保存。", "Settings saved.")),
-        Err(e) => println!("{}", if lang == Lang::En { e.message } else { match e.code {
+    let message = match result {
+        Ok(()) => text(lang, "设置已保存。", "Settings saved."),
+        Err(e) => if lang == Lang::En { e.message } else { match e.code {
             2 => "设置无效：保留额度需为 1–98%，候选最低额度需高于保留额度；启用前请选择候选账号。",
             3 => "账号已不存在，请重新加载账号列表。",
             5 => "设置已被其他端修改，或正在切换账号。请重新加载后再试。",
             _ => "无法读取或保存设置，请检查文件权限并重新加载。",
-        } }),
-    }
-    picker::wait_for_key(lang);
+        } },
+    };
+    picker::wait_for_key_with_message(lang, Some(message));
 }
 
 pub(super) fn show_settings(root: &Path, lang: Lang) {
@@ -57,17 +57,17 @@ pub(super) fn show_experiments(root: &Path, lang: Lang) {
         match menu(lang, text(lang, "实验功能", "Experimental Features"), &items, 0) {
             Some(0) => report(lang, experiments::configure(root, !enabled)),
             Some(1) => {
-                if !enabled {
-                    println!("{}", text(lang, "请先开启界面汉化。", "Turn on Chinese interface first."));
+                let message = if !enabled {
+                    text(lang, "请先开启界面汉化。", "Turn on Chinese interface first.").to_string()
                 } else if !cfg!(any(target_os = "macos", target_os = "windows")) {
-                    println!("{}", text(lang, "App 汉化仅支持 Windows 和 macOS。", "App translation is available only on Windows/macOS."));
+                    text(lang, "App 汉化仅支持 Windows 和 macOS。", "App translation is available only on Windows/macOS.").to_string()
                 } else {
                     match experiments::run_foreground(root, lang) {
-                        Ok(message) => println!("{message}"),
-                        Err(e) => println!("{}", text(lang, "无法启动汉化续期，请检查实验功能设置。", e.message)),
+                        Ok(message) => message,
+                        Err(e) => text(lang, "无法启动汉化续期，请检查实验功能设置。", e.message).to_string(),
                     }
-                }
-                picker::wait_for_key(lang);
+                };
+                picker::wait_for_key_with_message(lang, Some(&message));
             }
             _ => break,
         }

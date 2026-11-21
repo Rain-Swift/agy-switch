@@ -26,7 +26,14 @@ watchdog.unref();
 let terminal, output = '', allOutput = '', exited;
 let checks = 0;
 async function until(text) {
-  for (let i = 0; i < 100; i++) { if (output.includes(text)) { checks++; console.log('Terminal reached: ' + text); return; } await delay(100); }
+  let exitWait = 0;
+  for (let i = 0; i < 100; i++) {
+    if (output.includes(text)) { checks++; console.log('Terminal reached: ' + text); return; }
+    if (exited && ++exitWait >= 3) {
+      throw new Error(`Terminal exited (code=${exited.exitCode}, signal=${exited.signal}) before reaching ${text}; captured ${output.length} bytes`);
+    }
+    await delay(100);
+  }
   throw new Error(`Terminal did not reach ${text}; captured ${output.length} bytes`);
 }
 async function send(keys, text) { output = ''; terminal.write(keys); await until(text); }
