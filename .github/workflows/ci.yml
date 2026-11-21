@@ -463,11 +463,15 @@ jobs:
           retention-days: 14
 
       - name: Package macOS arm64 test app
+        env:
+          # Complete ad-hoc bundle sealing; prevents macOS from reporting an unsealed bundle as damaged.
+          APPLE_SIGNING_IDENTITY: "-"
         run: |
           set -euo pipefail
           npm run tauri bundle -- --debug --bundles app
           APP="src-tauri/target/debug/bundle/macos/agy-switch.app"
-          [[ "$(lipo -archs "$APP/Contents/MacOS/agy-switch-desktop")" == "arm64" ]]
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/verify-macos-bundle.mjs "$APP" "$VERSION"
           node scripts/test-cli.mjs "$APP/Contents/MacOS/agy-switch-desktop"
           mkdir -p artifacts/macos-test
           ARCHIVE="artifacts/macos-test/agy-switch-test-${SOURCE_HEAD}-macos-arm64.zip"
