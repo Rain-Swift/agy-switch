@@ -12,6 +12,7 @@ const {
   getCanonicalModelKey,
   getCanonicalModelDisplayName,
   getCanonicalModelSublabel,
+  getCanonicalModelTag,
   getModelProtectionKey,
   findQuotaModel,
   ensurePinnedImageSelector,
@@ -24,14 +25,20 @@ test('Gemini 4 effort tiers fold into their canonical model', () => {
   for (const id of ['gemini-4-argon-low', 'gemini-4-argon-medium', 'gemini-4-argon-high', 'gemini-4-argon']) {
     assert.equal(getCanonicalModelKey(id), 'gemini-4-argon', id);
   }
+  for (const id of ['gemini-4-neon-low', 'gemini-4-neon-medium', 'gemini-4-neon-high', 'gemini-4-neon-xhigh', 'gemini-4-neon-disabled', 'gemini-4-neon']) {
+    assert.equal(getCanonicalModelKey(id), 'gemini-4-neon', id);
+  }
   for (const id of ['gemini-4-hydrogen-low', 'gemini-4-hydrogen-medium', 'gemini-4-hydrogen-high', 'gemini-4-hydrogen-xhigh', 'gemini-4-hydrogen']) {
     assert.equal(getCanonicalModelKey(id), 'gemini-4-hydrogen', id);
   }
   assert.equal(getCanonicalModelDisplayName('gemini-4-carbon-high'), 'Gemini 4 Carbon');
   assert.equal(getCanonicalModelDisplayName('gemini-4-argon-high'), 'Gemini 4 Argon');
+  assert.equal(getCanonicalModelDisplayName('gemini-4-neon-xhigh'), 'Gemini 4 Neon');
   assert.equal(getCanonicalModelDisplayName('gemini-4-hydrogen-xhigh'), 'Gemini 4 Hydrogen');
   assert.equal(getCanonicalModelSublabel('gemini-4-argon'), 'Shared quota pool: Low / Medium / High');
+  assert.equal(getCanonicalModelSublabel('gemini-4-neon'), 'Shared quota pool: Low / Medium / High / Extra');
   assert.equal(getCanonicalModelSublabel('gemini-4-hydrogen'), 'Shared quota pool: Low / Medium / High / Extra');
+  assert.equal(getCanonicalModelTag('gemini-4-neon'), 'PRO');
 });
 
 test('Orchestrator identities stay separate from their planner models', () => {
@@ -63,15 +70,17 @@ test('image variants never collapse into a chat Flash or Pro family', () => {
   }
 });
 
-test('catalog categories keep Carbon, Argon, and Hydrogen in the Gemini families', () => {
+test('catalog categories keep Carbon, Argon, Neon, and Hydrogen in the Gemini families', () => {
   assert.equal(categorizeModel('gemini-4-carbon-high'), 'gemini-pro');
   assert.equal(categorizeModel('gemini-4-argon-high'), 'gemini-pro');
+  assert.equal(categorizeModel('gemini-4-neon-xhigh'), 'gemini-pro');
   assert.equal(categorizeModel('gemini-4-hydrogen-xhigh'), 'gemini-flash');
   assert.equal(categorizeModel('gemini-pro-orchestrator'), 'gemini-pro');
   assert.equal(categorizeModel('gemini-pro-orchestrator-argon'), 'gemini-pro');
   assert.equal(categorizeModel('claude-opus-5-5'), 'claude');
   assert.equal(getModelProtectionKey('gemini-4-carbon'), 'gemini-3-pro-high');
   assert.equal(getModelProtectionKey('gemini-4-argon'), 'gemini-3-pro-high');
+  assert.equal(getModelProtectionKey('gemini-4-neon'), 'gemini-3-pro-high');
   assert.equal(getModelProtectionKey('gemini-4-hydrogen'), 'gemini-3-flash');
 });
 

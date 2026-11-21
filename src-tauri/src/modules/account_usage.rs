@@ -1125,7 +1125,7 @@ pub async fn calculate_all_account_valuations() -> Result<QuotaValuationResponse
 
     let prices_snapshot = api_pricing::get_api_pricing().await.unwrap_or_else(|_| {
         api_pricing::ApiPricingSnapshot {
-            parser_revision: 4,
+            parser_revision: api_pricing::PARSER_REVISION,
             prices: api_pricing::builtin_fallback_prices(),
             fetched_at: Utc::now().timestamp(),
             stale: true,
@@ -2279,5 +2279,71 @@ mod tests {
         let buckets = get_account_effective_buckets(&q, now_ts);
         assert_eq!(buckets.len(), 1);
         assert_eq!(buckets[0].0.bucket_id, "gemini-weekly");
+    }
+
+    #[test]
+    fn gemini_4_neon_events_attribute_and_price_against_gemini_pool() {
+        let bucket = QuotaBucket {
+            bucket_id: "gemini-5h".into(),
+            window: "5h".into(),
+            remaining_fraction: 0.5,
+            remaining_fraction_known: Some(true),
+            reset_time: "2026-11-21T18:00:00Z".into(),
+            display_name: None,
+            description: None,
+        };
+        let reset_ts = parse_rfc3339_timestamp(&bucket.reset_time).unwrap();
+        let now_ts = reset_ts - 3600;
+        let spans = vec![AccountUsageSpan {
+            account_id: "acc_pro".into(),
+            start_ts: reset_ts - 18000,
+            end_ts: now_ts,
+        }];
+        let events = vec![
+            GenerationEvent {
+                model: "gemini-4-neon-xhigh".into(),
+                input_tokens: 1_000_000,
+                output_tokens: 100_000,
+                cached_tokens: 0,
+                total_tokens: 1_100_000,
+                timestamp_seconds: reset_ts - 5000,
+            },
+            GenerationEvent {
+                model: "Gemini 4 Neon (High)".into(),
+                input_tokens: 0,
+                output_tokens: 0,
+                cached_tokens: 1_000_000,
+                total_tokens: 1_000_000,
+                timestamp_seconds: reset_ts - 4000,
+            },
+        ];
+        let prices = api_pricing::builtin_fallback_prices();
+        let mut cal_store = QuotaCapacityCalibrationStore::default();
+        let mut cal_dirty = false;
+        let config = AppConfig::default();
+
+        let val = valuate_bucket(
+            &bucket,
+            "Gemini Models",
+            "acc_pro",
+            "Google AI Pro",
+            true,
+            None,
+            None,
+            now_ts,
+            &spans,
+            &events,
+            &prices,
+            &mut cal_store,
+            &mut cal_dirty,
+            &config,
+            7.25,
+        );
+
+        assert_eq!(val.pool, "gemini");
+        assert!(val.warning.is_none());
+        // $3.00 (1M input) + $1.50 (100K output) + $0.15 (1M cached) = $4.65
+        assert!((val.used_usd - 4.65).abs() < 1e-6);
+        assert_eq!(val.provenance, "observed");
     }
 }

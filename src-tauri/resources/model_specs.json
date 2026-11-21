@@ -30,6 +30,11 @@
             "thinking_budget": 49152,
             "is_thinking": true
         },
+        "gemini-4-neon": {
+            "max_output_tokens": 262144,
+            "thinking_budget": 49152,
+            "is_thinking": true
+        },
         "gemini-4-hydrogen": {
             "max_output_tokens": 262144,
             "thinking_budget": 32768,

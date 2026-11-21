@@ -192,6 +192,7 @@ mod tests {
         assert_eq!(quota_group_label("Gemini 4 Carbon"), "Gemini 4 Carbon");
         assert_eq!(model_quota_pool("gemini-4-argon-high", None), Some(QuotaPool::Argon));
         assert_eq!(model_quota_pool("gemini-4-carbon-high", None), Some(QuotaPool::Carbon));
+        assert_eq!(model_quota_pool("gemini-4-neon-xhigh", None), Some(QuotaPool::Gemini));
         assert_eq!(model_quota_pool("gemini-4-hydrogen-xhigh", None), Some(QuotaPool::Gemini));
         assert_eq!(model_quota_pool("gemini-pro-orchestrator", None), Some(QuotaPool::Carbon));
         assert_eq!(model_quota_pool("gemini-pro-orchestrator-argon", None), Some(QuotaPool::Argon));

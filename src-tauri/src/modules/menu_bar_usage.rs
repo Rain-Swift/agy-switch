@@ -66,7 +66,7 @@ pub(crate) fn pricing_keys(model: &str) -> (String, Option<String>) {
     static GEMINI: OnceLock<regex::Regex> = OnceLock::new();
     let exact = TOKENS.get_or_init(|| regex::Regex::new(r"[a-z]+|[0-9]+").unwrap())
         .find_iter(model).map(|token| token.as_str()).collect::<Vec<_>>().join("-");
-    let pattern = GEMINI.get_or_init(|| regex::Regex::new(r"^gemini-([0-9]+(?:-[0-9]+)*)-(flash(?:-lite)?|pro|argon|carbon|hydrogen)(?:-(.*))?$").unwrap());
+    let pattern = GEMINI.get_or_init(|| regex::Regex::new(r"^gemini-([0-9]+(?:-[0-9]+)*)-(flash(?:-lite)?|pro|argon|carbon|hydrogen|neon)(?:-(.*))?$").unwrap());
     if let Some(gemini) = pattern.captures(&exact) {
         let suffix: Vec<_> = gemini.get(3).map(|value| value.as_str().split('-').collect()).unwrap_or_default();
         let distinct_variant = suffix.iter().any(|token| ["lite", "image", "vision", "audio", "tts", "live", "embedding", "embeddings", "robotics", "native"].contains(token));
@@ -181,5 +181,16 @@ mod tests {
     fn partial_estimate_retains_the_unpriced_count() {
         let (usd, missing) = estimate(&[model("gemini-3.8-flash"), model("unknown")], &[price()]);
         assert!((usd.unwrap() - 1.275).abs() < 1e-9); assert_eq!(missing, 1);
+    }
+    #[test]
+    fn gemini_4_neon_variants_price_against_base_rate() {
+        let neon = ApiPricing { model: "gemini-4-neon".into(), input: 3.0, output: 15.0, cached: 0.15 };
+        // 1M input ($3.00) + 100K output ($1.50) + 2M cached ($0.30) = $4.80
+        for name in ["gemini-4-neon", "gemini-4-neon-xhigh", "Gemini 4 Neon (Extra)", "Gemini 4 Neon (High)", "gemini-4-neon-medium", "gemini-4-neon-low"] {
+            let (usd, missing) = estimate(&[model(name)], &[neon.clone()]);
+            assert!((usd.unwrap() - 4.8).abs() < 1e-9, "{name}");
+            assert_eq!(missing, 0, "{name}");
+        }
+        assert_eq!(estimate(&[model("gemini-4-neon-image")], &[neon]), (None, 1));
     }
 }
