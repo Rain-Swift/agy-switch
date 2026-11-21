@@ -43,3 +43,13 @@ test('unknown cost differs from known zero and no activity',()=>{
  assert.deepEqual(estimateApiCost([model(price.model)],{prices:[{...price,input:0,output:0,cached:0}]}),{usd:0,pricedModels:1,unpricedModels:0});
  assert.deepEqual(estimateApiCost([],null),{usd:0,pricedModels:0,unpricedModels:0});
 });
+test('Gemini 4 Neon effort tiers estimate standard Neon rates without leaking to image variants',()=>{
+ const neon={model:'gemini-4-neon',input:3,output:15,cached:.15};
+ const prices={prices:[neon]};
+ for(const name of ['gemini-4-neon','gemini-4-neon-xhigh','Gemini 4 Neon (Extra)','Gemini 4 Neon (High)','gemini-4-neon-medium','gemini-4-neon-low']){
+  assert.equal(findModelPricing(name,prices),neon,name);
+  assert.deepEqual(estimateApiCost([model(name)],prices),{usd:18.15,pricedModels:1,unpricedModels:0},name);
+ }
+ assert.equal(findModelPricing('gemini-4-neon-image',prices),undefined);
+ assert.deepEqual(estimateApiCost([model('gemini-4-neon-image')],prices),{usd:0,pricedModels:0,unpricedModels:1});
+});

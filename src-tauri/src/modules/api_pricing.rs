@@ -10,7 +10,7 @@ const AGENT_PLATFORM_PRICING_URL: &str =
     "https://platform.claude.com/docs/en/about-claude/pricing.md";
 const EXCHANGE_RATE_API_URL: &str = "https://open.er-api.com/v6/latest/USD";
 const CACHE_TTL_SECONDS: i64 = 24 * 60 * 60;
-const PARSER_REVISION: u32 = 5;
+pub(crate) const PARSER_REVISION: u32 = 6;
 const DEFAULT_USD_TO_CNY: f64 = 7.25;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -273,6 +273,7 @@ pub fn builtin_fallback_prices() -> Vec<ApiPricing> {
     vec![
         ApiPricing { model: "gemini-4-carbon".into(), input: carbon_input, output: carbon_output, cached: carbon_cached },
         ApiPricing { model: "gemini-4-argon".into(), input: carbon_input, output: carbon_output, cached: carbon_cached },
+        ApiPricing { model: "gemini-4-neon".into(), input: 3.00, output: 15.00, cached: 0.15 },
         ApiPricing { model: "gemini-4-hydrogen".into(), input: 1.50, output: 7.50, cached: 0.075 },
         ApiPricing { model: "gemini-3.8-flash".into(), input: flash_input, output: flash_output, cached: flash_cached },
         ApiPricing { model: "gemini-3.6-flash".into(), input: flash_input, output: flash_output, cached: flash_cached },
@@ -928,6 +929,76 @@ mod tests {
         assert_eq!((before[1].input, before[1].output, before[1].cached), (1.50, 7.50, 0.075));
         let after = parse_gemini_prices(md, NaiveDate::from_ymd_opt(2026, 12, 1).unwrap());
         assert_eq!((after[0].input, after[0].output, after[0].cached), (4.0, 20.0, 0.20));
+    }
+
+    #[test]
+    fn parses_gemini_4_neon_markdown_and_includes_it_in_builtin_fallback() {
+        let md = r#"
+## Gemini 4 Neon  {% id="gemini-4-neon" %}
+
+{% tabs %}
+  {% tab title="Standard" %}
+  {% table %}
+  * Feature
+  * Free Tier
+  * Paid Tier, per 1M tokens in USD
+
+  ---
+
+  * Input price
+  * Not available
+  * $3.00
+
+  ---
+
+  * Output price (including thinking tokens)
+  * Not available
+  * $15.00
+
+  ---
+
+  * Context caching price
+  * Not available
+  * $0.15
+  Implicit caching only (explicit caching is not supported).
+  {% /table %}
+  {% /tab %}
+  {% tab title="Batch" %}
+  {% table %}
+  * Input price
+  * Not available
+  * $1.50
+
+  ---
+
+  * Output price (including thinking tokens)
+  * Not available
+  * $7.50
+  {% /table %}
+  {% /tab %}
+  {% tab title="Priority" %}
+  {% table %}
+  * Input price
+  * Not available
+  * $5.40
+
+  ---
+
+  * Output price (including thinking tokens)
+  * Not available
+  * $27.00
+  {% /table %}
+  {% /tab %}
+{% /tabs %}
+        "#;
+        let prices = parse_gemini_prices(md, NaiveDate::from_ymd_opt(2026, 11, 21).unwrap());
+        assert_eq!(prices.len(), 1);
+        assert_eq!(prices[0].model, "gemini-4-neon");
+        assert_eq!((prices[0].input, prices[0].output, prices[0].cached), (3.0, 15.0, 0.15));
+
+        let fallback = builtin_fallback_prices();
+        let neon = fallback.iter().find(|p| p.model == "gemini-4-neon").expect("gemini-4-neon must exist in fallback prices");
+        assert_eq!((neon.input, neon.output, neon.cached), (3.0, 15.0, 0.15));
     }
 
     #[test]
